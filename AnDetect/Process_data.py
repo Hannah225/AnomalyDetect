@@ -76,7 +76,7 @@ def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thres
     print(f"Percent of non-errors: {balance:.2%}\n")
 
 
-def data_preprocess(df, gaussian_data = False, error_thresh = 0):
+def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
     """ Takes full dataset and retruns test/train split as well as tensor datasets.
         Gaussian Data ist set to False, if set to True function will assume that 
         gaussian data is used - not implemented yet
@@ -84,6 +84,7 @@ def data_preprocess(df, gaussian_data = False, error_thresh = 0):
         Parameters
         ----------
         df : full dataframe (pd df)
+        device: The device the tensors to store on; cuda if its available
 
         Note: Function Prints out information about the datasets
 
@@ -139,14 +140,18 @@ def data_preprocess(df, gaussian_data = False, error_thresh = 0):
     test_y = test_data['error']
     #DATA TO TENSORS
     x_tensor =  torch.from_numpy(train_x).float() #torch.Size([24589, 257])
+    x_tensor.to(device)
     y_tensor =  torch.from_numpy(train_y.values.ravel()).float() # torch.Size([24589, 1])
     y_tensor = y_tensor.unsqueeze(1) #Adds one dimension to the tensor to make them comparable
+    y_tensor.to(device)
     #CREATE TRAIN DATASET
     train_ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)
 
     #CREATE TEST DATASET
     xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
+    xtest_tensor.to(device)
     ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
+    ytest_tensor.to(device)
     #For the validation/test dataset
     ytest_tensor = ytest_tensor.unsqueeze(1)
     test_ds =  torch.utils.data.TensorDataset(xtest_tensor, ytest_tensor)

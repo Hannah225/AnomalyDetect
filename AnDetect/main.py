@@ -6,9 +6,10 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 import Process_data
 from Model_TestTrain import MLP_Residual, train_model, test_model
-import os
 
-print(os.path.abspath(''))
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Available Device: {device}")
 
 ##GET THE DATA
 gen_data = False #do we want to use generated data for the sanity check
@@ -22,7 +23,7 @@ if gen_data:
     )
 else:
     df = Process_data.get_data()
-    train_ds, test_ds, test_y = Process_data.data_preprocess(df)
+    train_ds, test_ds, test_y = Process_data.data_preprocess(df, device)
 
 
 ##BOILERPLATE
@@ -68,6 +69,7 @@ test_loader = DataLoader(test_ds, batch_size=batchsize)
 
 ##SET UP MODEL
 model = MLP_Residual(n_input_dim, n_hidden1, n_hidden3, n_output, n_blocks)
+model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps = 0.00001, weight_decay= 0.01)
 
 train_loss, test_loss = train_model(train_loader, test_loader, model, optimizer, loss_func, epochs)
