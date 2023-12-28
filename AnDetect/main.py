@@ -4,8 +4,11 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
-import data
+import Process_data
 from Model_TestTrain import MLP_Residual, train_model, test_model
+import os
+
+print(os.path.abspath(''))
 
 ##GET THE DATA
 gen_data = False #do we want to use generated data for the sanity check
@@ -13,17 +16,17 @@ use_gaussian_data = False #Gaussian data currently not useable (minor fixes need
 
 
 if gen_data:
-    test_df, train_ds, xtest_tensor, ytest_tensor, test_y, train_y, test_x, train_x = data.use_gen_data(
+    test_df, train_ds, test_y = Process_data.use_gen_data(
         mean_var_error = (1, 0.5, 1.5, 1), #(mu, sigma of mean dist; mu, sigma of var dist if there is an error)
         mean_var_noError = (1, 1, 1, 0.5) #(mu, sigma of mean dist; mu, sigma of var dist if there is NO error)
     )
 else:
-    df = data.get_data()
-    train_ds, test_ds, test_y = data.data_preprocess(df)
+    df = Process_data.get_data()
+    train_ds, test_ds, test_y = Process_data.data_preprocess(df)
 
 
 ##BOILERPLATE
-n_input_dim = train_x.shape[1]
+n_input_dim = train_ds.__getitem__(1)[0].shape[0] #256 Variables each; we access the first tensor in our ds and then get the shape of the tensor
 n_hidden1 = 1024
 n_hidden2 = 512
 n_hidden3 = 128
@@ -34,7 +37,7 @@ n_blocks = 4
 
 batchsize = 512
 learning_rate = 0.001
-epochs = 20
+epochs = 10
 
 error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
@@ -70,8 +73,8 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps = 0.0000
 train_loss, test_loss = train_model(train_loader, test_loader, model, optimizer, loss_func, epochs)
 print('Last iteration loss+ value: ' + str(train_loss[-1]))
 
-plt.plot(train_loss, '-')
-plt.plot(test_loss, '-', alpha = 0.6)
+plt.plot(train_loss, '-', label = "Training Loss")
+plt.plot(test_loss, '-', label = "Testing Loss", alpha = 0.6)
 plt.savefig("loss")
 
 test_model(error_thresh, test_loader, model, test_y, use_gaussian_data = use_gaussian_data,

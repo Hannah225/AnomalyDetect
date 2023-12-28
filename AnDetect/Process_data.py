@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import matplotlib as plt
 from sklearn.preprocessing import MinMaxScaler
 import torch
 
@@ -15,12 +14,12 @@ def get_data():
         ------
         merged dataset with all variables an binary errorcodes
         """
-    faults_df = pd.read_pickle("data/faults.pkl") 
+    faults_df = pd.read_pickle("AnDetect/data/faults.pkl") 
 
     #Read in the latent variables
     column_names = ["index", "date", "system"]
-    latent_mean = pd.read_csv("data/output_latent_means.csv")
-    latent_var = pd.read_csv("data/output_latent_variances.csv")
+    latent_mean = pd.read_csv("AnDetect/data/output_latent_means.csv")
+    latent_var = pd.read_csv("AnDetect/data/output_latent_variances.csv")
 
 
     #Rename the columns (add suffix mean/var and rename the first three columns)
@@ -41,7 +40,7 @@ def get_data():
     #create new column with boolean on wether there was an error or not
     latent_merge_full['error'] = np.where(latent_merge_full['errorcodes'].notna(), True, False)
     #drop unneccessary columns
-    latent_merge_full.drop(columns=['index_x', 'index_y', 'errorcodes'])
+    latent_merge_full = latent_merge_full.drop(columns=['index_x', 'index_y', 'errorcodes'])
 
     return latent_merge_full
 
@@ -65,13 +64,13 @@ def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thres
     else:
         num_faults = dataset['error'].value_counts(1)
     total_length = len(dataset)
-    balance = num_faults[0] / total_length
+    balance = num_faults[0] / total_length *100
     anteil = len(dataset) / len(full_dataset)
     #Print out Inofrmation about the Dataset
     print(f"Dataset: {name}")
     print(f"Partition: {anteil:.2%}")
     print(f"Total Length: {total_length}")
-    print(f"Errors: Ussing Error-Threshold {error_thresh}")
+    #print(f"Errors: Ussing Error-Threshold {error_thresh}") #only needed for gaussian data
     print(f"Number of Errors: {num_faults[1]}")
     print(f"Number of Non-errors: {num_faults[0]}")
     print(f"Percent of non-errors: {balance:.2%}\n")
