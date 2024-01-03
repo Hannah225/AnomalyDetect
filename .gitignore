@@ -1,1 +1,3 @@
-AnDetect/__pychache__/
+AnDetect/__pycache__/
+*.out
+loss.png
