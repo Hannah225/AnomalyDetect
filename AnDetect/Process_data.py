@@ -14,12 +14,12 @@ def get_data():
         ------
         merged dataset with all variables an binary errorcodes
         """
-    faults_df = pd.read_pickle("AnDetect/data/faults.pkl") 
+    faults_df = pd.read_pickle("data/faults.pkl") 
 
     #Read in the latent variables
     column_names = ["index", "date", "system"]
-    latent_mean = pd.read_csv("AnDetect/data/output_latent_means.csv")
-    latent_var = pd.read_csv("AnDetect/data/output_latent_variances.csv")
+    latent_mean = pd.read_csv("data/output_latent_means.csv")
+    latent_var = pd.read_csv("data/output_latent_variances.csv")
 
 
     #Rename the columns (add suffix mean/var and rename the first three columns)

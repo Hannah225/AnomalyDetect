@@ -1,3 +1,5 @@
 AnDetect/__pycache__/
 *.out
-loss.png
+**.png
+#ipynb are just for local testing and shouldn't be tracked
+**.ipynb
