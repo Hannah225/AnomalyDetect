@@ -140,16 +140,13 @@ def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
     test_y = test_data['error']
     #DATA TO TENSORS
     x_tensor =  torch.from_numpy(train_x).float() #torch.Size([24589, 257])
-    x_tensor.to(device)
     y_tensor =  torch.from_numpy(train_y.values.ravel()).float() # torch.Size([24589, 1])
     y_tensor = y_tensor.unsqueeze(1) #Adds one dimension to the tensor to make them comparable
-    y_tensor.to(device)
     #CREATE TRAIN DATASET
     train_ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)
 
     #CREATE TEST DATASET
     xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
-    xtest_tensor.to(device)
     ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
     
     #For the validation/test dataset

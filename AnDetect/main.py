@@ -62,13 +62,19 @@ loss_func = nn.BCEWithLogitsLoss(pos_weight=class_weight)
 
 #Dataloader
 train_loader = DataLoader(train_ds, batch_size=batchsize,
-                        generator=torch.Generator(device=device),
+                        #generator=torch.Generator(device=device),
                         #sampler=sampler
                         shuffle = True, 
                         #pin_memory=True
 )
-test_loader = DataLoader(test_ds, batch_size=batchsize, generator=torch.Generator(device=device),)
+test_loader = DataLoader(test_ds, batch_size=batchsize
+                         #, generator=torch.Generator(device=device)
+                         )
 
+for x in train_loader:
+    x = x.to(device, non_blocking=True)
+for x in test_loader:
+ x = x.to(device, non_blocking=True)
 
 ##SET UP MODEL
 model = MLP_Residual(n_input_dim, n_hidden1, n_hidden3, n_output, n_blocks)
