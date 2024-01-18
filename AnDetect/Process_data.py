@@ -64,7 +64,7 @@ def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thres
     else:
         num_faults = dataset['error'].value_counts(1)
     total_length = len(dataset)
-    balance = num_faults[0] / total_length *100
+    balance = num_faults[0] / total_length
     anteil = len(dataset) / len(full_dataset)
     #Print out Inofrmation about the Dataset
     print(f"Dataset: {name}")
@@ -151,11 +151,10 @@ def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
     xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
     xtest_tensor.to(device)
     ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
-    ytest_tensor.to(device)
+    
     #For the validation/test dataset
     ytest_tensor = ytest_tensor.unsqueeze(1)
     test_ds =  torch.utils.data.TensorDataset(xtest_tensor, ytest_tensor)
-    
     
 
     return train_ds, test_ds, test_y

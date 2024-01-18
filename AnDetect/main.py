@@ -11,6 +11,7 @@ from Hyperparameter_Tuning import dynamic_eval
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Available Device: {device}")
+torch.set_default_device(device)
 
 ##GET THE DATA
 gen_data = False #do we want to use generated data for the sanity check
