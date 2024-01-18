@@ -67,3 +67,6 @@ for i in range(grouped_mean_mean.shape[0]):
     ax_i.set_ylabel('Values', fontsize="8")
 
 plt.savefig("Systems_MeanVar_Sorted")
+
+
+

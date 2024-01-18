@@ -57,7 +57,7 @@ def dynamic_eval(test_loader, model, test_y, error_thresh = 0, use_gaussian_data
   plt.xlabel("Cutoff Value")
   plt.ylabel("F1 Score")
   plt.title("Change in F1 Scores")
-  plt.show()
+  plt.savefig("f1_optim")
 
   # Define the values you want to plot
   value_labels = {'tn': 'True Negative', 'fp': 'False Positive', 'fn': 'False Negative', 'tp': 'True Positive'}
@@ -80,7 +80,7 @@ def dynamic_eval(test_loader, model, test_y, error_thresh = 0, use_gaussian_data
   axes[-1].set_xlabel("Cutoff Value")
   # Adjust layout and show the plots
   plt.tight_layout()
-  plt.show()
+  plt.savefig("tpfp_cutoff")
 
   return row_with_max_f1
 

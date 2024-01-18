@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 import Process_data
 from Model_TestTrain import MLP_Residual, train_model, test_model
+from Hyperparameter_Tuning import dynamic_eval
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,3 +83,9 @@ plt.savefig("loss")
 test_model(error_thresh, test_loader, model, test_y, use_gaussian_data = use_gaussian_data,
         model_has_sigmoid= False
         )
+
+dynamic_eval(test_loader, model, test_y, 
+            use_gaussian_data = use_gaussian_data,
+            model_has_sigmoid= False,
+            error_thresh = error_thresh
+          )
