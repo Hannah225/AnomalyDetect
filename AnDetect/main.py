@@ -40,7 +40,7 @@ n_blocks = 4
 
 batchsize = 512
 learning_rate = 0.001
-epochs = 10
+epochs = 400
 
 error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
