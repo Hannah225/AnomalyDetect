@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import precision_recall_curve
 import torch
 
 def get_data():
@@ -53,6 +54,49 @@ def get_new_data():
 
     return data
 
+def get_AnomalyScorePred():
+    data = pd.read_csv("AnDetect/data/new/ensemble/predictions.csv")
+    data["likelihood"] = [float(val) for val in data["likelihood"].to_list()]
+
+    error_sys = [
+            34, 59, 5, 68, 37, 2, 67, 52, 54, 65, 15, 30, 47,  #many errors in these systems
+            31, 902, 27, 12, #Not so many errors
+            28, 49, 44, 36, 64, 70, 41, 51, 903, 46, 26, 23, 72, 16 # very little errors
+        ]
+
+    #RANDOM Train Test split (for testing purposes only)
+    #all_systems = data["system"].unique()
+    #error_sys = np.random.choice(all_systems, size=24, replace=False)
+
+    #Do the train test split
+    train_data = data[data['system'].isin(error_sys)]
+    test_data = data[~data['system'].isin(error_sys)]
+
+    test_anomaly_scores = test_data["anomaly_score"].values
+    test_likelihoods = test_data["likelihood"].values
+    test_sto = test_data["sto"].values == 1
+
+    train_anomaly_scores = train_data["anomaly_score"].values
+    train_likelihoods = train_data["likelihood"].values
+    train_sto = train_data["sto"].values == 1
+
+    #get best cutoff values for anomaly and likelihood
+    p,r,t = precision_recall_curve(train_sto, train_anomaly_scores)
+    p[p==0] = 1e-10
+    r[r==0] = 1e-10
+    f1 = 2*p*r/(p+r)
+    anomaly_threshold = t[np.argmax(f1)]
+
+    p,r,t = precision_recall_curve(train_sto, train_likelihoods)
+    p[p==0] = 1e-10
+    r[r==0] = 1e-10
+    f1 = 2*p*r/(p+r)
+    likelihood_threshold = t[np.argmax(f1)]
+
+    anomaly_score_predictions = test_anomaly_scores > anomaly_threshold
+    likelihood_predictions = test_likelihoods > likelihood_threshold
+
+    return anomaly_score_predictions, likelihood_predictions
 
 
 def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thresh = 0): #not accurate for gaussian data

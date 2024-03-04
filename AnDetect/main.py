@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
-
 import torch
+import sklearn
 from torch import nn
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from sklearn.metrics import cohen_kappa_score, f1_score
 
 import Process_data
 from Model_TestTrain import MLP_Residual, train_model, test_model
@@ -40,7 +41,7 @@ n_blocks = 4
 
 batchsize = 512
 learning_rate = 0.00001
-epochs = 500
+epochs = 10000
 
 error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
@@ -85,9 +86,21 @@ plt.plot(train_loss, '-', label = "Training Loss")
 plt.plot(test_loss, '-', label = "Testing Loss", alpha = 0.6)
 plt.savefig("loss")
 
-test_model(error_thresh, test_loader, model, test_y, device, use_gaussian_data = use_gaussian_data,
+mlp_pred = test_model(error_thresh, test_loader, model, test_y, device, use_gaussian_data = use_gaussian_data,
         model_has_sigmoid= False
         )
+
+y_true_test = test_y.values.ravel()
+anomaly_score_predictions, likelihood_predictions = Process_data.get_AnomalyScorePred()
+anomaly_score_f1_score = f1_score(y_true_test, anomaly_score_predictions)
+likelihood_f1_score = f1_score(y_true_test, likelihood_predictions)
+print("F1 score for anomaly_score:", anomaly_score_f1_score)
+print("F1 score for likelihood:", likelihood_f1_score)
+
+print("----------------------------------")
+print("Cohens Kappa Score MLP - True:", cohen_kappa_score(mlp_pred, y_true_test))
+print("Cohens Kappa Score Anomaly - True:", cohen_kappa_score(anomaly_score_predictions, y_true_test))
+print("Cohens Kappa Score Anomaly - MLP:", cohen_kappa_score(anomaly_score_predictions, mlp_pred))
 
 """ dynamic_eval(test_loader, model, test_y, 
             use_gaussian_data = use_gaussian_data,
