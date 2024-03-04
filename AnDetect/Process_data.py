@@ -47,7 +47,7 @@ def get_data():
 
 def get_new_data():
     #data = pd.read_csv("data/new/ensemble/predictions.csv")
-    data = pd.read_csv("AnDetect/data/new/probabilistic/predictions.csv")
+    data = pd.read_csv("data/new/probabilistic/predictions.csv")
     data = data.rename({'sto':'error'}, axis=1)
     data = data.rename({'day':'date'}, axis=1)
     data = data.drop(columns = ['Unnamed: 0', 'merk', 'anomaly_score', 'likelihood'], axis = 1)
