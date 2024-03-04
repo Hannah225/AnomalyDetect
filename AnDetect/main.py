@@ -56,7 +56,9 @@ error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
 #Weighted Loss Function
 class_weight = torch.FloatTensor([15])
+class_weight = class_weight.to(device)
 loss_func = nn.BCEWithLogitsLoss(pos_weight=class_weight)
+loss_func.to(device)
     #loss_func = nn.BCEWithLogitsLoss() #We can still apply this even with gaussian filter because we have values between 0 and 1
     #loss_func = nn.BCELoss()
 
@@ -87,8 +89,8 @@ test_model(error_thresh, test_loader, model, test_y, device, use_gaussian_data =
         model_has_sigmoid= False
         )
 
-dynamic_eval(test_loader, model, test_y, 
+""" dynamic_eval(test_loader, model, test_y, 
             use_gaussian_data = use_gaussian_data,
             model_has_sigmoid= False,
             error_thresh = error_thresh
-          )
+          ) """

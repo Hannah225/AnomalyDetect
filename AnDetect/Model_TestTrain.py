@@ -55,9 +55,12 @@ def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, devi
     for xb, yb in train_dl:
       xb = xb.to(device)
       yb = yb.to(device)
+      print("xb yb Device", xb.device, yb.device)
       optimizer.zero_grad()
       y_pred = model(xb)
+      print("pred Device", y_pred.device)
       loss = loss_func(y_pred, yb)
+      print("loss Device", loss.device)
       loss.backward()
       optimizer.step()
 
