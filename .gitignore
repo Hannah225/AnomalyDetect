@@ -4,3 +4,4 @@ AnDetect/__pycache__/
 #ipynb are just for local testing and shouldn't be tracked
 **.ipynb
 **.pptx
+**.docx

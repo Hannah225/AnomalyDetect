@@ -44,6 +44,16 @@ def get_data():
 
     return latent_merge_full
 
+def get_new_data():
+    data = pd.read_csv("AnDetect/data/new/ensemble/predictions.csv")
+    #data = pd.read_csv("AnDetect/data/new/probabilistic/predictions.csv")
+    data = data.rename({'sto':'error'}, axis=1)
+    data = data.rename({'day':'date'}, axis=1)
+    data = data.drop(columns = ['Unnamed: 0', 'merk', 'anomaly_score', 'likelihood'], axis = 1)
+
+    return data
+
+
 
 def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thresh = 0): #not accurate for gaussian data
     """ Takes dataset and parent dataset and print out infomration about it
@@ -76,7 +86,7 @@ def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thres
     print(f"Percent of non-errors: {balance:.2%}\n")
 
 
-def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
+def data_preprocess(df, gaussian_data = False, error_thresh = 0):
     """ Takes full dataset and retruns test/train split as well as tensor datasets.
         Gaussian Data ist set to False, if set to True function will assume that 
         gaussian data is used - not implemented yet
@@ -84,7 +94,6 @@ def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
         Parameters
         ----------
         df : full dataframe (pd df)
-        device: The device the tensors to store on; cuda if its available
 
         Note: Function Prints out information about the datasets
 
@@ -100,7 +109,7 @@ def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
     error_sys = [
         34, 59, 5, 68, 37, 2, 67, 52, 54, 65, 15, 30, 47,  #many errors in these systems
         31, 902, 27, 12, #Not so many errors
-        28, 49, 44, 36, 64, 70, 1, 41, 51, 903, 46, 26, 23, 72, 16 # very little errors
+        28, 49, 44, 36, 64, 70, 41, 51, 903, 46, 26, 23, 72, 16 # very little errors
     ]
 
     #partition data based on wether the system is in error sys or not
@@ -131,9 +140,10 @@ def data_preprocess(df, device, gaussian_data = False, error_thresh = 0):
     #SCALING
     scaler = MinMaxScaler()
     #Scale X data
-    train_x = train_data.iloc[:, 2:-1] #drop date and systems at beginning, error at the end
+    train_x = train_data.drop(columns = ['date', 'system', 'error'], axis = 1)
+    #train_x = train_data.iloc[:, 2:-1] #drop date and systems at beginning, error at the end
     train_x = scaler.fit_transform(train_x)
-    test_x = test_data.iloc[:, 2:-1]
+    test_x = test_data.drop(columns = ['date', 'system', 'error'], axis = 1)
     test_x = scaler.transform(test_x)
     #Extract prediction data (y data)
     train_y = train_data['error']

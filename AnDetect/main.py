@@ -11,7 +11,7 @@ from Hyperparameter_Tuning import dynamic_eval
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Available Device: {device}")
-torch.set_default_device(device)
+#torch.set_default_device(device)
 
 ##GET THE DATA
 gen_data = False #do we want to use generated data for the sanity check
@@ -24,8 +24,8 @@ if gen_data:
         mean_var_noError = (1, 1, 1, 0.5) #(mu, sigma of mean dist; mu, sigma of var dist if there is NO error)
     )
 else:
-    df = Process_data.get_data()
-    train_ds, test_ds, test_y = Process_data.data_preprocess(df, device)
+    df = Process_data.get_new_data()
+    train_ds, test_ds, test_y = Process_data.data_preprocess(df)
 
 
 ##BOILERPLATE
@@ -39,8 +39,8 @@ n_output = 1
 n_blocks = 4
 
 batchsize = 512
-learning_rate = 0.001
-epochs = 400
+learning_rate = 0.00001
+epochs = 500
 
 error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
@@ -71,24 +71,19 @@ test_loader = DataLoader(test_ds, batch_size=batchsize
                          #, generator=torch.Generator(device=device)
                          )
 
-for x in train_loader:
-    x = x.to(device, non_blocking=True)
-for x in test_loader:
- x = x.to(device, non_blocking=True)
-
 ##SET UP MODEL
 model = MLP_Residual(n_input_dim, n_hidden1, n_hidden3, n_output, n_blocks)
-model.to(device)
+model.to(device=device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps = 0.00001, weight_decay= 0.01)
 
-train_loss, test_loss = train_model(train_loader, test_loader, model, optimizer, loss_func, epochs)
+train_loss, test_loss = train_model(train_loader, test_loader, model, optimizer, loss_func, epochs, device=device)
 print('Last iteration loss+ value: ' + str(train_loss[-1]))
 
 plt.plot(train_loss, '-', label = "Training Loss")
 plt.plot(test_loss, '-', label = "Testing Loss", alpha = 0.6)
 plt.savefig("loss")
 
-test_model(error_thresh, test_loader, model, test_y, use_gaussian_data = use_gaussian_data,
+test_model(error_thresh, test_loader, model, test_y, device, use_gaussian_data = use_gaussian_data,
         model_has_sigmoid= False
         )
 

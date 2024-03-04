@@ -45,7 +45,7 @@ class MLP_Residual(nn.Module):
         return out
     
 
-def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, model_has_sigmoid = False):
+def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, device, model_has_sigmoid = False):
   train_loss = []
   test_loss = []
   loop = tqdm(range(epochs), leave=False, total=epochs)
@@ -53,6 +53,8 @@ def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, mode
     loop.set_description(f"Epoch [{epoch + 1}/{epochs}]")
     model.train()
     for xb, yb in train_dl:
+      xb = xb.to(device)
+      yb = yb.to(device)
       optimizer.zero_grad()
       y_pred = model(xb)
       loss = loss_func(y_pred, yb)
@@ -62,6 +64,8 @@ def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, mode
     model.eval()
     with torch.no_grad():
       for xb_test, yb_test in test_loader:
+        xb_test = xb_test.to(device)
+        yb_test = yb_test.to(device)
         y_test_pred = model(xb_test)
         valid_loss = loss_func(y_test_pred, yb_test)
     
@@ -72,11 +76,12 @@ def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, mode
 
 
 
-def test_model(error_thresh, test_loader, model, test_y, use_gaussian_data = False, model_has_sigmoid = True):
+def test_model(error_thresh, test_loader, model, test_y, device, use_gaussian_data = False, model_has_sigmoid = True):
   y_pred_list = []
   model.eval()
   with torch.no_grad():
     for xb_test, yb_test in test_loader:
+      xb_test = xb_test.to(device)
       y_test_pred = model(xb_test)
       if(model_has_sigmoid):
         y_pred_tag = torch.round(y_test_pred)
@@ -97,3 +102,4 @@ def test_model(error_thresh, test_loader, model, test_y, use_gaussian_data = Fal
   print("Precision of the MLP :\t" + str(metrics.precision_score(y_true_test, y_pred_list)))
   print("Recall of the MLP    :\t" + str(metrics.recall_score(y_true_test, y_pred_list)))
   print("F1 Score of the Model :\t" + str(metrics.f1_score(y_true_test, y_pred_list)))
+  return y_pred_list
