@@ -47,7 +47,7 @@ def get_data():
 
 def get_new_data():
     #data = pd.read_csv("data/new/ensemble/predictions.csv")
-    data = pd.read_csv("data/new/probabilistic/predictions.csv")
+    data = pd.read_csv("AnDetect/data/new/probabilistic/predictions.csv")
     data = data.rename({'sto':'error'}, axis=1)
     data = data.rename({'day':'date'}, axis=1)
     data = data.drop(columns = ['Unnamed: 0', 'merk', 'anomaly_score', 'likelihood'], axis = 1)
@@ -55,8 +55,8 @@ def get_new_data():
     return data
 
 def get_AnomalyScorePred():
-    data = pd.read_csv("data/new/probabilistic/predictions.csv")
-    data["likelihood"] = [float(val) for val in data["likelihood"].to_list()]
+    data = pd.read_csv("AnDetect/data/new/probabilistic/predictions.csv")
+    data["likelihood"] = [float(val[7:-1]) for val in data["likelihood"].to_list()]
 
     error_sys = [
             34, 59, 5, 68, 37, 2, 67, 52, 54, 65, 15, 30, 47,  #many errors in these systems
@@ -185,22 +185,24 @@ def data_preprocess(df, gaussian_data = False, error_thresh = 0):
     scaler = MinMaxScaler()
     #Scale X data
     train_x = train_data.drop(columns = ['date', 'system', 'error'], axis = 1)
-    #train_x = train_data.iloc[:, 2:-1] #drop date and systems at beginning, error at the end
-    train_x = scaler.fit_transform(train_x)
+    #train_x = scaler.fit_transform(train_x)
     test_x = test_data.drop(columns = ['date', 'system', 'error'], axis = 1)
-    test_x = scaler.transform(test_x)
+    #test_x = scaler.transform(test_x)
+
     #Extract prediction data (y data)
     train_y = train_data['error']
     test_y = test_data['error']
     #DATA TO TENSORS
-    x_tensor =  torch.from_numpy(train_x).float() #torch.Size([24589, 257])
+    #x_tensor =  torch.from_numpy(train_x).float()
+    x_tensor =  torch.from_numpy(train_x.to_numpy()).float() #torch.Size([24589, 257])
     y_tensor =  torch.from_numpy(train_y.values.ravel()).float() # torch.Size([24589, 1])
     y_tensor = y_tensor.unsqueeze(1) #Adds one dimension to the tensor to make them comparable
     #CREATE TRAIN DATASET
     train_ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)
 
     #CREATE TEST DATASET
-    xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
+    #xtest_tensor =  torch.from_numpy(test_x).float()
+    xtest_tensor =  torch.from_numpy(test_x.to_numpy()).float() #torch.Size([13235, 257])
     ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
     
     #For the validation/test dataset

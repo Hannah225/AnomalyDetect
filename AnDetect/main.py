@@ -41,7 +41,7 @@ n_blocks = 4
 
 batchsize = 512
 learning_rate = 0.00001
-epochs = 10000
+epochs = 2000
 
 error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
@@ -101,6 +101,8 @@ print("----------------------------------")
 print("Cohens Kappa Score MLP - True:", cohen_kappa_score(mlp_pred, y_true_test))
 print("Cohens Kappa Score Anomaly - True:", cohen_kappa_score(anomaly_score_predictions, y_true_test))
 print("Cohens Kappa Score Anomaly - MLP:", cohen_kappa_score(anomaly_score_predictions, mlp_pred))
+print("Cohens Kappa Score Likelihood - MLP:", cohen_kappa_score(likelihood_predictions, mlp_pred))
+
 
 """ dynamic_eval(test_loader, model, test_y, 
             use_gaussian_data = use_gaussian_data,
