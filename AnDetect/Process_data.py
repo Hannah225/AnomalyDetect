@@ -1,93 +1,258 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
+from sklearn.decomposition import PCA
 from sklearn.metrics import precision_recall_curve
+from datetime import datetime
+import umap
 import torch
 
-def get_data():
-    """ Takes pickel data (faults.pkl) and returns full dataset
-
-        Parameters
-        ----------
-        None, searchs for data in given directory
-
-        Returns
-        ------
-        merged dataset with all variables an binary errorcodes
-        """
-    faults_df = pd.read_pickle("data/faults.pkl") 
-
-    #Read in the latent variables
-    column_names = ["index", "date", "system"]
-    latent_mean = pd.read_csv("data/output_latent_means.csv")
-    latent_var = pd.read_csv("data/output_latent_variances.csv")
-
-
-    #Rename the columns (add suffix mean/var and rename the first three columns)
-    num_remaining_columns = latent_var.shape[1] - len(column_names)
-    mean_cols = [f'mean_{i+1}' for i in range(num_remaining_columns)]
-    var_cols = [f'var_{i+1}' for i in range(num_remaining_columns)]
-    latent_mean.columns = column_names + mean_cols
-    latent_var.columns = column_names + var_cols
-
-    faults_df = faults_df.rename(columns={'day': 'date'})
-    faults_df['system'] = faults_df['system'].str.lstrip('0')
-    faults_df['system'] = faults_df['system'].astype(int)
-
-    #Full outer join of all three data frames
-    latent_merge = pd.merge(latent_mean, latent_var, on = ['date', 'system'])
-    latent_merge_full = pd.merge(latent_merge, faults_df, on = ['date', 'system'], how = 'outer')
-
-    #create new column with boolean on wether there was an error or not
-    latent_merge_full['error'] = np.where(latent_merge_full['errorcodes'].notna(), True, False)
-    #drop unneccessary columns
-    latent_merge_full = latent_merge_full.drop(columns=['index_x', 'index_y', 'errorcodes'])
-
-    return latent_merge_full
-
-def get_new_data():
-    #data = pd.read_csv("data/new/ensemble/predictions.csv")
-    data = pd.read_csv("data/new/probabilistic/predictions.csv")
-    data = data.rename({'sto':'error'}, axis=1)
-    data = data.rename({'day':'date'}, axis=1)
-    data = data.drop(columns = ['Unnamed: 0', 'merk', 'anomaly_score', 'likelihood'], axis = 1)
-
-    return data
-
-def get_AnomalyScorePred():
-    data = pd.read_csv("data/new/probabilistic/predictions.csv")
-    data["likelihood"] = [float(val[7:-1]) for val in data["likelihood"].to_list()]
-
-    error_sys = [
+#for a fixed train test split we use this split
+error_sys = [
             34, 59, 5, 68, 37, 2, 67, 52, 54, 65, 15, 30, 47,  #many errors in these systems
             31, 902, 27, 12, #Not so many errors
             28, 49, 44, 36, 64, 70, 41, 51, 903, 46, 26, 23, 72, 16 # very little errors
         ]
 
-    #RANDOM Train Test split (for testing purposes only)
-    #all_systems = data["system"].unique()
-    #error_sys = np.random.choice(all_systems, size=24, replace=False)
+#We can get the data in various different preprocessed states:
+#All data is returned in the same format from all functions (yay!)
 
-    #Do the train test split
-    train_data = data[data['system'].isin(error_sys)]
-    test_data = data[~data['system'].isin(error_sys)]
+# get_normal_data: noc scaling, no transformations
+# get_scaled_robust_data: robust scaling
+# get_scaled_standard_data: standard scaling
+# get_pca_data: data dimensions is reduced with pca; number of dimensions is def. in n_components param
+# get_umap_data: dimension reduction with umap; also n_components param
+# get_merk_data: error data coupled with merk (all noted as error)
+# get_gauss_data: errors calculated with gaussian filter and certain threshold
+# mlp_data: convert the results of all other functions to tensors for the mlp
+# get_AnomalyPred: returns anomaly and likelihood predicitions
 
-    test_anomaly_scores = test_data["anomaly_score"].values
-    test_likelihoods = test_data["likelihood"].values
-    test_sto = test_data["sto"].values == 1
+def get_data():
+    data = pd.read_csv("data/new/probabilistic/predictions.csv")
+    data = data.rename({'sto':'error'}, axis=1)
+    data = data.rename({'day':'date'}, axis=1)
+    data["likelihood"] = [float(val[7:-1]) for val in data["likelihood"].to_list()]
+    return data
 
-    train_anomaly_scores = train_data["anomaly_score"].values
-    train_likelihoods = train_data["likelihood"].values
-    train_sto = train_data["sto"].values == 1
+def train_test_split(data, error_sys = error_sys):
+    #do the train_test_split:
+    train_df = data[data['system'].isin(error_sys)]
+    test_df = data[~data['system'].isin(error_sys)]
+    return train_df, test_df
+
+
+#return normal data (with train/test split):
+def get_normal_data(error_sys = error_sys):
+    data = get_data()
+
+    #do the train_test_split:
+    train_df, test_df = train_test_split(data)
+
+    #split x and y:
+    train_x = train_df.values[:,-256:].astype(float)
+    test_x = test_df.values[:,-256:].astype(float)
+
+    train_y = train_df["error"].values == 1
+    test_y = test_df["error"].values == 1
+
+    return train_x, test_x, train_y, test_y
+
+
+def get_scaled_standard_data(error_sys = error_sys):
+    scaler = StandardScaler()
+    train_x, test_x, train_y, test_y = get_normal_data(error_sys)
+    train_x = scaler.fit_transform(train_x)
+    test_x = scaler.transform(test_x)
+
+    return train_x, test_x, train_y, test_y
+
+
+def get_scaled_robust_data(error_sys = error_sys):
+    scaler = RobustScaler() #apparently works well with data that contains outliers
+    train_x, test_x, train_y, test_y = get_normal_data(error_sys)
+    train_x = scaler.fit_transform(train_x)
+    test_x = scaler.transform(test_x)
+
+    return train_x, test_x, train_y, test_y
+
+def get_pca_data(error_sys = error_sys):
+    #n_components tells us to how many dimensions the pca is reducing the data to
+    #Initialize the pca
+    n_components = 20
+    pca = PCA(n_components=n_components)
+    #get the data
+    data = get_data()
+    #transform the data and then replace the old data with the new pca tranformed data
+    pca_res = pca.fit_transform(data.values[:,-256:])
+    pca_res = pd.DataFrame(pca_res)
+    data = pd.concat([data.iloc[:, :-256], pca_res], axis=1)
+
+    #do the train test split:
+    train_df, test_df = train_test_split(data)
+
+    #split x and y:
+    train_x = train_df.values[:,-n_components:].astype(float)
+    test_x = test_df.values[:,-n_components:].astype(float)
+
+    train_y = train_df["error"].values == 1
+    test_y = test_df["error"].values == 1
+    
+    return train_x, test_x, train_y, test_y
+
+def get_umap_data(error_sys = error_sys):
+    #takes about 30sec to transform
+    #function has same logic as pca transformation
+    n_components = 2
+    umap_transformation = umap.UMAP(n_neighbors=15, n_components=n_components, min_dist=0.1)
+
+    data = get_data()
+    umap_transformation.fit(data.values[:,-256:])
+    transformed = umap_transformation.transform(data.values[:,-256:])
+
+    transformed = pd.DataFrame(transformed)
+    data = pd.concat([data.iloc[:, :-256], transformed], axis=1)
+
+    #do the train test split:
+    train_df, test_df = train_test_split(data)
+
+    #split x and y:
+    train_x = train_df.values[:,-n_components:].astype(float)
+    test_x = test_df.values[:,-n_components:].astype(float)
+
+    train_y = train_df["error"].values == 1
+    test_y = test_df["error"].values == 1
+    
+    return train_x, test_x, train_y, test_y
+
+
+def get_merk_data(error_sys = error_sys):
+    data = get_data()
+    #einfach alle beide zusammengenommen und immer als Fehler gewertet
+    data['error'] = data.apply(lambda row: 1 if row['error'] == 1 or row['merk'] == 1 else 0, axis=1)
+    #do the train_test_split:
+    train_df, test_df = train_test_split(data)
+
+    #split x and y:
+    train_x = train_df.values[:,-256:].astype(float)
+    test_x = test_df.values[:,-256:].astype(float)
+
+    train_y = train_df["error"].values == 1
+    test_y = test_df["error"].values == 1
+
+    return train_x, test_x, train_y, test_y
+
+##### gauss helper functions ###########################
+
+def get_dates(idx, system_data, system_firstIndex):
+    corr_dateInd = []
+    corr_dateInd.append(idx)
+    curr_idx = idx
+    while(
+        (curr_idx > system_firstIndex) and
+        (((datetime.strptime(system_data['date'][curr_idx], '%Y-%m-%d') - 
+          datetime.strptime(system_data['date'][curr_idx - 1], '%Y-%m-%d')).days == 1))
+    ):
+        corr_dateInd.append(curr_idx)
+        curr_idx = curr_idx - 1
+    curr_idx = idx
+    while(
+        (curr_idx < system_firstIndex + len(system_data)-1) and
+        (((datetime.strptime(system_data['date'][curr_idx + 1], '%Y-%m-%d')
+            - datetime.strptime(system_data['date'][curr_idx], '%Y-%m-%d')).days  == 1))
+    ):
+        corr_dateInd.append(curr_idx)
+        curr_idx = curr_idx + 1
+    return corr_dateInd
+
+def gauss_dist(corr_days, idx, sigma):
+    # Generate the Gaussian distribution for each element in 'days' based on its distance from 'error_index'
+    const = (1/(sigma * np.sqrt(2*np.pi)))
+    gaussian_dist = [
+        const * np.exp(-0.5 * (np.square(day - idx) / sigma)) for day in corr_days
+    ]
+
+    return gaussian_dist
+
+def apply_gaussian_filter(df, sigma):
+    df['gauss_error'] = np.zeros(shape=(len(df),1))
+    for system in df['system'].unique():
+        system_firstIndex = df[df['system'] == system].index.min() #startet bei 0
+        system_data = df[df['system'] == system] #Indizierung folgt den indizies des gesamten df
+
+        #geht von system_firstIndex bis system_firstIndex + len(system_data) - 1
+        error_indices = system_data.index[system_data['error'] == 1].tolist()
+        #print(system, system_firstIndex, (system_data['date'][system_firstIndex] - system_data['date'][system_firstIndex + 1]).days)
+        for idx in error_indices:
+            corr_days = get_dates(idx, system_data, system_firstIndex)
+            corr_days = list(set(corr_days))
+            corr_days.sort()
+            dist = gauss_dist(corr_days, idx, sigma = sigma)
+            #print(34, len(dist), len(corr_days), (corr_days[0] - 1) - corr_days[-1])
+            start = corr_days[0]
+            end = corr_days[-1]
+            df.loc[start:end, 'gauss_error'] += dist
+    df.loc[df['error'], 'gauss_error'] = 1
+    return df
+
+#### end gauss helper functions #####
+
+def get_gauss_data(error_sys = error_sys):
+    data = get_data()
+    #gaußschen Filter draufwerfen (s.o.)
+    data = apply_gaussian_filter(data, 0.5)
+    #cutoff für die error werte festlegen, dann error basierend auf den cutoff werten berechnen
+    cutoff_val = 0.5
+    data['error'] = data.apply(lambda row: 1 if row['error'] == 1 or row['gauss_error'] >= cutoff_val else 0, axis=1)
+    data.drop(columns = ['gauss_error'], axis = 1) #drop gauss error col
+    #do the train_test_split:
+    train_df, test_df = train_test_split(data)
+
+    #split x and y:
+    train_x = train_df.values[:,-256:].astype(float)
+    test_x = test_df.values[:,-256:].astype(float)
+
+    train_y = train_df["error"].values == 1
+    test_y = test_df["error"].values == 1
+
+    return train_x, test_x, train_y, test_y
+
+
+def mlp_data(train_x, test_x, train_y, test_y):
+    x_tensor =  torch.from_numpy(train_x).float() #torch.Size([24589, 257])
+    y_tensor =  torch.from_numpy(train_y).float() # torch.Size([24589, 1])
+    y_tensor = y_tensor.unsqueeze(1) #Adds one dimension to the tensor to make them comparable
+    #CREATE TRAIN DATASET
+    train_ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)
+
+    #CREATE TEST DATASET
+    xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
+    ytest_tensor =  torch.from_numpy(test_y).float() 
+    ytest_tensor = ytest_tensor.unsqueeze(1)
+    test_ds =  torch.utils.data.TensorDataset(xtest_tensor, ytest_tensor)
+
+    return train_ds, test_ds
+
+def get_AnomalyPred(error_sys = error_sys):
+    data = get_data()
+    train_x, test_x, train_y, test_y = get_normal_data(error_sys)
+    #do the train_test_split:
+    train_df, test_df = train_test_split(data)
+
+    train_anomaly_scores = train_df["anomaly_score"].values
+    train_likelihoods = train_df["likelihood"].values
+
+    test_anomaly_scores = test_df["anomaly_score"].values
+    test_likelihoods = test_df["likelihood"].values
 
     #get best cutoff values for anomaly and likelihood
-    p,r,t = precision_recall_curve(train_sto, train_anomaly_scores)
+    p,r,t = precision_recall_curve(train_y, train_anomaly_scores)
     p[p==0] = 1e-10
     r[r==0] = 1e-10
     f1 = 2*p*r/(p+r)
     anomaly_threshold = t[np.argmax(f1)]
 
-    p,r,t = precision_recall_curve(train_sto, train_likelihoods)
+    p,r,t = precision_recall_curve(train_y, train_likelihoods)
     p[p==0] = 1e-10
     r[r==0] = 1e-10
     f1 = 2*p*r/(p+r)
@@ -97,197 +262,3 @@ def get_AnomalyScorePred():
     likelihood_predictions = test_likelihoods > likelihood_threshold
 
     return anomaly_score_predictions, likelihood_predictions
-
-
-def dataset_info(dataset, full_dataset, name, gaussian_data = False, error_thresh = 0): #not accurate for gaussian data
-    """ Takes dataset and parent dataset and print out infomration about it
-
-        Parameters
-        ----------
-        dataset to be described, the parent dataset of that set and the name of the dataset (i.e. Training)
-        rest is optinal
-
-        Returns
-        ------
-        Prints
-        """
-    if(gaussian_data):
-        num_faults = [0, 0]
-        num_faults[1] = [1 if x > error_thresh else 0 for x in dataset['gauss_error']].count(1)
-        num_faults[0] = len(dataset) - num_faults[1]
-    else:
-        num_faults = dataset['error'].value_counts(1)
-    total_length = len(dataset)
-    balance = num_faults[0] / total_length
-    anteil = len(dataset) / len(full_dataset)
-    #Print out Inofrmation about the Dataset
-    print(f"Dataset: {name}")
-    print(f"Partition: {anteil:.2%}")
-    print(f"Total Length: {total_length}")
-    #print(f"Errors: Ussing Error-Threshold {error_thresh}") #only needed for gaussian data
-    print(f"Number of Errors: {num_faults[1]}")
-    print(f"Number of Non-errors: {num_faults[0]}")
-    print(f"Percent of non-errors: {balance:.2%}\n")
-
-
-def data_preprocess(df, gaussian_data = False, error_thresh = 0):
-    """ Takes full dataset and retruns test/train split as well as tensor datasets.
-        Gaussian Data ist set to False, if set to True function will assume that 
-        gaussian data is used - not implemented yet
-
-        Parameters
-        ----------
-        df : full dataframe (pd df)
-
-        Note: Function Prints out information about the datasets
-
-        Returns
-        ------
-        train_ds and test_ds: tensor datasets of test and train data
-        test_y: original prediciton data with test train split to evaluate the model
-        """
-
-    #TEST TRAIN SPLIT
-    #Systeme mit den meisten Fehlern (diese sollten im Training sein):
-    #Hier einige Systeme mit vielen Fehlern nehmen, einige mit wenigen. Der Großteil der Fehler ist im Trainingsset
-    error_sys = [
-        34, 59, 5, 68, 37, 2, 67, 52, 54, 65, 15, 30, 47,  #many errors in these systems
-        31, 902, 27, 12, #Not so many errors
-        28, 49, 44, 36, 64, 70, 41, 51, 903, 46, 26, 23, 72, 16 # very little errors
-    ]
-
-    #partition data based on wether the system is in error sys or not
-    train_data = df[df['system'].isin(error_sys)]
-    test_data = df[~df['system'].isin(error_sys)]
-
-    dataset_info(df, df, "All Data", gaussian_data, error_thresh)
-    dataset_info(train_data, df, "Trainingdata" , gaussian_data, error_thresh)
-    dataset_info(test_data, df, "Testdata", gaussian_data, error_thresh)
-
-    # if(gaussian_data):
-    #     train_x = train_data.iloc[:, 2:-3]
-    #     test_x = test_data.iloc[:, 2:-3]
-    #     train_y = train_data['gauss_error']
-    #     test_y = test_data['gauss_error']
-
-    #     scaler = MinMaxScaler()
-    #     train_x = scaler.fit_transform(train_x)
-    #     test_x = scaler.transform(test_x)
-
-    #     x_tensor =  torch.from_numpy(train_x).float() #torch.Size([24589, 257])
-    #     y_tensor =  torch.from_numpy(train_y.values.ravel()).float() # torch.Size([24589, 1])
-    #     xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
-    #     ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
-    # else:
-        #Scale data
-    
-    #SCALING
-    scaler = MinMaxScaler()
-    #Scale X data
-    train_x = train_data.drop(columns = ['date', 'system', 'error'], axis = 1)
-    #train_x = scaler.fit_transform(train_x)
-    test_x = test_data.drop(columns = ['date', 'system', 'error'], axis = 1)
-    #test_x = scaler.transform(test_x)
-
-    #Extract prediction data (y data)
-    train_y = train_data['error']
-    test_y = test_data['error']
-    #DATA TO TENSORS
-    #x_tensor =  torch.from_numpy(train_x).float()
-    x_tensor =  torch.from_numpy(train_x.to_numpy()).float() #torch.Size([24589, 257])
-    y_tensor =  torch.from_numpy(train_y.values.ravel()).float() # torch.Size([24589, 1])
-    y_tensor = y_tensor.unsqueeze(1) #Adds one dimension to the tensor to make them comparable
-    #CREATE TRAIN DATASET
-    train_ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)
-
-    #CREATE TEST DATASET
-    #xtest_tensor =  torch.from_numpy(test_x).float()
-    xtest_tensor =  torch.from_numpy(test_x.to_numpy()).float() #torch.Size([13235, 257])
-    ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
-    
-    #For the validation/test dataset
-    ytest_tensor = ytest_tensor.unsqueeze(1)
-    test_ds =  torch.utils.data.TensorDataset(xtest_tensor, ytest_tensor)
-    
-
-    return train_ds, test_ds, test_y
-
-
-def use_gen_data(
-        mean_var_error,
-        mean_var_noError
-):
-    """ Generates data for the models sanity check; Data has same dimensions as original data.
-        Generated data is normal distributed with varying mean/var for error/non-error
-
-        Parameters
-        ----------
-        the mean/variance of the error datapoints
-        the mean/variance of the non-error datapoints 
-
-        Returns
-        ------
-        test_df: original dataset created
-        train_ds and test_ds: tensor datasets of test and train data
-        test_y: original prediciton data with test train split to evaluate the model
-        """
-    ## Generate Data
-    len_cols = 128
-    len_data = 37000
-
-    colnames_mean = [f'mean_{i + 1}' for i in range(len_cols)]
-    colnames_var = [f'var_{i + 1}' for i in range(len_cols)]
-
-    # Pre-allocate memory for the entire array
-    data = np.empty((len_data, 2 * len_cols + 1))
-
-    for i in range(len_data):
-        error = np.random.choice([0, 1], p=[1 - 0.05, 0.05])
-        data[i, 0] = error
-
-        if error == 1:
-            # Generate mean values
-            data[i, 1:len_cols + 1] = np.random.default_rng().normal(mean_var_error[0], mean_var_error[1], size=len_cols)
-            # Generate var values
-            data[i, len_cols + 1:] = np.random.default_rng().normal(mean_var_error[2], mean_var_error[3], size=len_cols)
-        else:
-            # Generate mean values
-            data[i, 1:len_cols + 1] = np.random.default_rng().normal(mean_var_noError[0], mean_var_noError[1], size=len_cols)
-            # Generate var values
-            data[i, len_cols + 1:] = np.random.default_rng().normal(mean_var_noError[2], mean_var_noError[3], size=len_cols)
-
-    # Create DataFrame
-    test_df = pd.DataFrame(data, columns=['error'] + colnames_mean + colnames_var)
-
-    # Convert columns to appropriate data types
-    test_df['error'] = test_df['error'].astype(int)
-
-    split = 0.75
-    train_rows = int(len(test_df) * split)
-    train_data = test_df.head(train_rows)
-    test_rows = int(len(test_df) * (1-split))
-    test_data = test_df.tail(test_rows)
-
-    scaler = MinMaxScaler()
-    train_x = train_data.iloc[:, 1:]
-    train_x = scaler.fit_transform(train_x)
-    test_x = test_data.iloc[:, 1:]
-    test_x = scaler.transform(test_x)
-    train_y = train_data['error']
-    test_y = test_data['error']
-
-    #DATA TO TENSORS
-    x_tensor =  torch.from_numpy(train_x).float() #torch.Size([24589, 257])
-    y_tensor =  torch.from_numpy(train_y.values.ravel()).float() # torch.Size([24589, 1])
-    y_tensor = y_tensor.unsqueeze(1) #Adds one dimension to the tensor to make them comparable
-    #CREATE TRAIN DATASET
-    train_ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)
-
-    #CREATE TEST DATASET
-    xtest_tensor =  torch.from_numpy(test_x).float() #torch.Size([13235, 257])
-    ytest_tensor =  torch.from_numpy(test_y.values.ravel()).float() 
-    #For the validation/test dataset
-    ytest_tensor = ytest_tensor.unsqueeze(1)
-    test_ds =  torch.utils.data.TensorDataset(xtest_tensor, ytest_tensor)
-
-    return test_df, train_ds, test_ds, test_y

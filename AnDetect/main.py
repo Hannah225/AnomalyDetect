@@ -1,9 +1,16 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import torch
-import sklearn
 from torch import nn
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from sklearn.metrics import cohen_kappa_score, f1_score
+
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import SVC
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, precision_recall_curve, precision_score, recall_score, cohen_kappa_score
 
 import Process_data
 from Model_TestTrain import MLP_Residual, train_model, test_model
@@ -12,22 +19,22 @@ from Hyperparameter_Tuning import dynamic_eval
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Available Device: {device}")
-#torch.set_default_device(device)
+
+# get_normal_data: noc scaling, no transformations
+# get_scaled_robust_data: robust scaling
+# get_scaled_standard_data: standard scaling
+# get_pca_data: data dimensions is reduced with pca; number of dimensions is def. in n_components param
+# get_umap_data: dimension reduction with umap; also n_components param
+# get_merk_data: error data coupled with merk (all noted as error)
 
 ##GET THE DATA
 gen_data = False #do we want to use generated data for the sanity check
 use_gaussian_data = False #Gaussian data currently not useable (minor fixes needed)
 
-
-if gen_data:
-    test_df, train_ds, test_y = Process_data.use_gen_data(
-        mean_var_error = (1, 0.5, 1.5, 1), #(mu, sigma of mean dist; mu, sigma of var dist if there is an error)
-        mean_var_noError = (1, 1, 1, 0.5) #(mu, sigma of mean dist; mu, sigma of var dist if there is NO error)
-    )
-else:
-    df = Process_data.get_new_data()
-    train_ds, test_ds, test_y = Process_data.data_preprocess(df)
-
+#get the original data
+data_name = "Normal"
+train_x, test_x, train_y, test_y = Process_data.get_normal_data()
+train_ds, test_ds = Process_data.mlp_data(train_x, test_x, train_y, test_y)
 
 ##BOILERPLATE
 n_input_dim = train_ds.__getitem__(1)[0].shape[0] #256 Variables each; we access the first tensor in our ds and then get the shape of the tensor
@@ -41,7 +48,7 @@ n_blocks = 4
 
 batchsize = 512
 learning_rate = 0.00001
-epochs = 2000
+epochs = 5
 
 error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
@@ -90,22 +97,94 @@ mlp_pred = test_model(error_thresh, test_loader, model, test_y, device, use_gaus
         model_has_sigmoid= False
         )
 
-y_true_test = test_y.values.ravel()
-anomaly_score_predictions, likelihood_predictions = Process_data.get_AnomalyScorePred()
-anomaly_score_f1_score = f1_score(y_true_test, anomaly_score_predictions)
-likelihood_f1_score = f1_score(y_true_test, likelihood_predictions)
-print("F1 score for anomaly_score:", anomaly_score_f1_score)
-print("F1 score for likelihood:", likelihood_f1_score)
+#===================================  OTHER CLASSIFIERS ==================================================================
 
-print("----------------------------------")
-print("Cohens Kappa Score MLP - True:", cohen_kappa_score(mlp_pred, y_true_test))
-print("Cohens Kappa Score Anomaly - True:", cohen_kappa_score(anomaly_score_predictions, y_true_test))
-print("Cohens Kappa Score Anomaly - MLP:", cohen_kappa_score(anomaly_score_predictions, mlp_pred))
-print("Cohens Kappa Score Likelihood - MLP:", cohen_kappa_score(likelihood_predictions, mlp_pred))
+# Define classifiers
+n_neighbors = 7
+knn_classifier = KNeighborsClassifier(n_neighbors=n_neighbors)
+clf = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=0.1)
+svc = SVC()
+logistic_model = LogisticRegression(solver = 'newton-cholesky', max_iter = 1000)
+isolation_forest = IsolationForest()
+#Fitting
+knn_classifier.fit(train_x, train_y)
+clf.fit(train_x)
+isolation_forest.fit(train_x)
+svc.fit(train_x, train_y)
+logistic_model.fit(train_x, train_y)
 
+# Predict using the trained classifiers
+knn_predictions = knn_classifier.predict(test_x)
+clf_pred = clf.fit_predict(test_x)
+clf_pred = np.array([False if i == 1 else True for i in clf_pred])
+i_f_p = isolation_forest.predict(test_x)
+isolation_forest_predictions = (i_f_p == 1)
+svc_predictions = svc.predict(test_x)
+logistic_predicitions = logistic_model.predict(test_x)
+
+
+anomaly_score_predictions, likelihood_predictions = Process_data.get_AnomalyPred()
+
+# Generate random predictions based on the error rate and test dataset size
+error_rate = np.mean(test_y)
+random_predictions = np.random.choice([True, False], size=len(test_y), p=[error_rate, 1 - error_rate])
 
 """ dynamic_eval(test_loader, model, test_y, 
             use_gaussian_data = use_gaussian_data,
             model_has_sigmoid= False,
             error_thresh = error_thresh
           ) """
+
+
+#======================== OBTAIN THE RESULTS ============================================================
+#gemeinsamer dataframe erzeugen:
+df = pd.DataFrame({'True_val': test_y,
+                   'Random': random_predictions, 
+                   'Logistic': logistic_predicitions,
+                   'SVC': svc_predictions,
+                   'IsolationForest': isolation_forest_predictions,
+                   'CLF': clf_pred,
+                   'KNN': knn_predictions,
+                   'MLP': mlp_pred,
+                   'Anomaly': anomaly_score_predictions,
+                   'Likelihood': likelihood_predictions
+                   })
+
+# results of: f1, precision und recall von jeder predicition
+f1 = []
+recall = []
+precision = []
+
+for column in df.columns:
+    f1.append(f1_score(test_y, df[column]))
+    recall.append(recall_score(test_y, df[column]))
+    precision.append(precision_score(test_y, df[column]))
+
+df_results = pd.DataFrame({
+    'Prediction' : df.columns,
+    'F1' : f1,
+    'Precision': precision,
+    'Recall': recall
+})
+
+#cohens kappa matrix
+cohen_matrix = [[0 for x in range(len(df.columns))] for y in range(len(df.columns))] 
+i = 0
+for column1 in df.columns:
+    j = 0
+    for column2 in df.columns:
+        cohen_matrix[i][j] = cohen_kappa_score(df[column1], df[column2])
+        j+=1
+    i+=1
+
+
+df_cohen = pd.DataFrame(
+    cohen_matrix, columns=df.columns,
+)
+df_cohen.insert(0, 'Method', df.columns)
+
+name_results = 'results/'+ data_name + '_Results.csv'
+name_cohen = 'results/'+ data_name + '_Cohen.csv'
+
+df_results.to_csv(name_results, sep=',', index=False, encoding='utf-8')
+df_cohen.to_csv(name_cohen, sep=',', index=False, encoding='utf-8')
