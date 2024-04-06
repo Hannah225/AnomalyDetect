@@ -111,7 +111,7 @@ for fn in data_sources:
     #===================================  OTHER CLASSIFIERS ==================================================================
 
     # Define classifiers
-    n_neighbors = 7
+    n_neighbors = 10
     knn_classifier = KNeighborsClassifier(n_neighbors=n_neighbors)
     clf = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=0.1)
     svc = SVC()
