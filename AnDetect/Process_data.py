@@ -79,7 +79,7 @@ def get_scaled_robust_data(error_sys = error_sys):
 def get_pca_data(error_sys = error_sys):
     #n_components tells us to how many dimensions the pca is reducing the data to
     #Initialize the pca
-    n_components = 20
+    n_components = 2
     pca = PCA(n_components=n_components)
     #get the data
     data = get_data()

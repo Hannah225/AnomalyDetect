@@ -58,8 +58,8 @@ for fn in data_sources:
     n_blocks = 4
 
     batchsize = 512
-    learning_rate = 0.00001
-    epochs = 5
+    learning_rate = 0.0001
+    epochs = 500
 
     error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
