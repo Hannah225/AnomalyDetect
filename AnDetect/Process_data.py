@@ -41,13 +41,23 @@ def train_test_split(data, error_sys = error_sys):
     test_df = data[~data['system'].isin(error_sys)]
     return train_df, test_df
 
+def rand_train_test_split(data, seed, error_sys = error_sys):
+    np.random.seed(seed)
+    #do the train_test_split:
+    all_systems = data["system"].unique()
+    train_systems = np.random.choice(all_systems, size=24, replace=False)
+
+    train_df = data[data['system'].isin(train_systems)]
+    test_df = data[~data['system'].isin(train_systems)]
+    return train_df, test_df
+
 
 #return normal data (with train/test split):
-def get_normal_data(error_sys = error_sys):
+def get_normal_data(seed, error_sys = error_sys):
     data = get_data()
 
     #do the train_test_split:
-    train_df, test_df = train_test_split(data)
+    train_df, test_df = rand_train_test_split(data, seed)
 
     #split x and y:
     train_x = train_df.values[:,-256:].astype(float)
@@ -56,27 +66,27 @@ def get_normal_data(error_sys = error_sys):
     train_y = train_df["error"].values == 1
     test_y = test_df["error"].values == 1
 
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
 
-def get_scaled_standard_data(error_sys = error_sys):
+def get_scaled_standard_data(seed, error_sys = error_sys):
     scaler = StandardScaler()
-    train_x, test_x, train_y, test_y = get_normal_data(error_sys)
+    train_df, test_df, train_x, test_x, train_y, test_y = get_normal_data(seed, error_sys)
     train_x = scaler.fit_transform(train_x)
     test_x = scaler.transform(test_x)
 
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
 
-def get_scaled_robust_data(error_sys = error_sys):
+def get_scaled_robust_data(seed, error_sys = error_sys):
     scaler = RobustScaler() #apparently works well with data that contains outliers
-    train_x, test_x, train_y, test_y = get_normal_data(error_sys)
+    train_df, test_df, train_x, test_x, train_y, test_y = get_normal_data(seed, error_sys)
     train_x = scaler.fit_transform(train_x)
     test_x = scaler.transform(test_x)
 
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
-def get_pca_data(error_sys = error_sys):
+def get_pca_data(seed, error_sys = error_sys):
     #n_components tells us to how many dimensions the pca is reducing the data to
     #Initialize the pca
     n_components = 2
@@ -89,7 +99,7 @@ def get_pca_data(error_sys = error_sys):
     data = pd.concat([data.iloc[:, :-256], pca_res], axis=1)
 
     #do the train test split:
-    train_df, test_df = train_test_split(data)
+    train_df, test_df = rand_train_test_split(data, seed)
 
     #split x and y:
     train_x = train_df.values[:,-n_components:].astype(float)
@@ -98,9 +108,9 @@ def get_pca_data(error_sys = error_sys):
     train_y = train_df["error"].values == 1
     test_y = test_df["error"].values == 1
     
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
-def get_umap_data(error_sys = error_sys):
+def get_umap_data(seed, error_sys = error_sys):
     #takes about 30sec to transform
     #function has same logic as pca transformation
     n_components = 2
@@ -114,7 +124,7 @@ def get_umap_data(error_sys = error_sys):
     data = pd.concat([data.iloc[:, :-256], transformed], axis=1)
 
     #do the train test split:
-    train_df, test_df = train_test_split(data)
+    train_df, test_df = rand_train_test_split(data, seed)
 
     #split x and y:
     train_x = train_df.values[:,-n_components:].astype(float)
@@ -123,15 +133,15 @@ def get_umap_data(error_sys = error_sys):
     train_y = train_df["error"].values == 1
     test_y = test_df["error"].values == 1
     
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
 
-def get_merk_data(error_sys = error_sys):
+def get_merk_data(seed, error_sys = error_sys):
     data = get_data()
     #einfach alle beide zusammengenommen und immer als Fehler gewertet
     data['error'] = data.apply(lambda row: 1 if row['error'] == 1 or row['merk'] == 1 else 0, axis=1)
     #do the train_test_split:
-    train_df, test_df = train_test_split(data)
+    train_df, test_df = rand_train_test_split(data, seed)
 
     #split x and y:
     train_x = train_df.values[:,-256:].astype(float)
@@ -140,7 +150,7 @@ def get_merk_data(error_sys = error_sys):
     train_y = train_df["error"].values == 1
     test_y = test_df["error"].values == 1
 
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
 ##### gauss helper functions ###########################
 
@@ -197,7 +207,7 @@ def apply_gaussian_filter(df, sigma):
 
 #### end gauss helper functions #####
 
-def get_gauss_data(error_sys = error_sys):
+def get_gauss_data(seed, error_sys = error_sys):
     data = get_data()
     #gaußschen Filter draufwerfen (s.o.)
     data = apply_gaussian_filter(data, 0.5)
@@ -206,7 +216,7 @@ def get_gauss_data(error_sys = error_sys):
     data['error'] = data.apply(lambda row: 1 if row['error'] == 1 or row['gauss_error'] >= cutoff_val else 0, axis=1)
     data.drop(columns = ['gauss_error'], axis = 1) #drop gauss error col
     #do the train_test_split:
-    train_df, test_df = train_test_split(data)
+    train_df, test_df = rand_train_test_split(data, seed)
 
     #split x and y:
     train_x = train_df.values[:,-256:].astype(float)
@@ -215,7 +225,7 @@ def get_gauss_data(error_sys = error_sys):
     train_y = train_df["error"].values == 1
     test_y = test_df["error"].values == 1
 
-    return train_x, test_x, train_y, test_y
+    return train_df, test_df, train_x, test_x, train_y, test_y
 
 
 def mlp_data(train_x, test_x, train_y, test_y):
@@ -233,17 +243,14 @@ def mlp_data(train_x, test_x, train_y, test_y):
 
     return train_ds, test_ds
 
-def get_AnomalyPred(error_sys = error_sys):
-    data = get_data()
-    train_x, test_x, train_y, test_y = get_normal_data(error_sys)
-    #do the train_test_split:
-    train_df, test_df = train_test_split(data)
-
+def get_AnomalyPred(train_df, test_df,):
     train_anomaly_scores = train_df["anomaly_score"].values
     train_likelihoods = train_df["likelihood"].values
 
     test_anomaly_scores = test_df["anomaly_score"].values
     test_likelihoods = test_df["likelihood"].values
+
+    train_y = train_df["error"].values == 1
 
     #get best cutoff values for anomaly and likelihood
     p,r,t = precision_recall_curve(train_y, train_anomaly_scores)

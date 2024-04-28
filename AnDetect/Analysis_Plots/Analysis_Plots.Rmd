@@ -1,0 +1,84 @@
+---
+title: "Analysis of Results"
+author: "Hannah Blaurock"
+date: '2024-04-07'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(plotly)
+library(viridis)
+library(lubridate)
+library(corrplot)
+
+theme_set(theme_classic())
+```
+
+```{r}
+names = list.files(path = "results", pattern="*Results.csv")
+path = paste("results/", names, sep="")
+fileList = lapply(path, read.csv)
+
+extracted_names <- list()
+for (name_split in names) {
+  # Extract the characters before the first "_"
+  extracted_name <- substr(name_split[[1]], 1, regexpr("_", name_split[[1]]) - 1)
+  # Add the extracted name to the list
+  extracted_names <- c(extracted_names, extracted_name)
+}
+
+i = 1
+for (file in fileList){
+  data = pivot_longer(file, cols = c("F1", "Precision", "Recall"), names_to = "Measure", values_to = "Value")
+  
+  ggplot(data, aes(Value, Prediction,  color = Measure)) +
+    geom_point() +
+    facet_grid(Measure ~ .) +
+    ggtitle(extracted_names[[i]])
+
+  ggsave(paste(extracted_names[[i]], "_plot.png"))
+  i = i+1
+  
+}
+
+```
+
+
+```{r}
+names = list.files(path = "results", pattern="*Cohen.csv")
+path = paste("results/", names, sep="")
+fileList = lapply(path, read.csv)
+
+
+i = 1
+for (file in fileList){
+  
+  mat <- data.matrix(subset(file, select=-Method))
+  rownames(mat) <- file$Method
+
+  png(filename=paste(extracted_names[[i]], "_Cohenplot.png"))
+  
+  corrplot(mat, method="color", 
+         #is.corr = FALSE, 
+         type="upper",
+          tl.col="black", tl.srt=45)
+
+  dev.off()
+  i = i+1
+  
+}
+
+```
+
+
+
+
+
+
+
+

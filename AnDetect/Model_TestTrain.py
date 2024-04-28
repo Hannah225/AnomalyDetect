@@ -64,18 +64,18 @@ def train_model(train_dl, test_loader, model, optimizer, loss_func, epochs, devi
       loss.backward()
       optimizer.step()
 
-    model.eval()
-    with torch.no_grad():
-      for xb_test, yb_test in test_loader:
-        xb_test = xb_test.to(device)
-        yb_test = yb_test.to(device)
-        y_test_pred = model(xb_test)
-        valid_loss = loss_func(y_test_pred, yb_test)
+    # model.eval()
+    # with torch.no_grad():
+    #   for xb_test, yb_test in test_loader:
+    #     xb_test = xb_test.to(device)
+    #     yb_test = yb_test.to(device)
+    #     y_test_pred = model(xb_test)
+    #     valid_loss = loss_func(y_test_pred, yb_test)
     
     loop.set_postfix(loss=loss.item())
     train_loss.append(loss.item())
-    test_loss.append(valid_loss.item())
-  return train_loss, test_loss
+    #test_loss.append(valid_loss.item())
+  return train_loss#, test_loss
 
 
 
@@ -92,14 +92,14 @@ def test_model(error_thresh, test_loader, model, test_y, device, use_gaussian_da
         y_pred_tag = torch.round(torch.sigmoid(y_test_pred))
       y_pred_list.append(y_pred_tag)
   y_pred_list = torch.cat(y_pred_list).view(-1).tolist()
-  print("Number of Errors with this error_thresh:\t" + str(sum(test_y)))
-  a = metrics.confusion_matrix(test_y, y_pred_list).ravel()
-  print("Confusion Matrix of the Test Set")
-  print("-----------")
-  print("tn,fp,fn,tp")
-  print(a)
-  print("-----------")
-  print("Precision of the MLP :\t" + str(metrics.precision_score(test_y, y_pred_list)))
-  print("Recall of the MLP    :\t" + str(metrics.recall_score(test_y, y_pred_list)))
-  print("F1 Score of the Model :\t" + str(metrics.f1_score(test_y, y_pred_list)))
+  # print("Number of Errors with this error_thresh:\t" + str(sum(test_y)))
+  # a = metrics.confusion_matrix(test_y, y_pred_list).ravel()
+  # print("Confusion Matrix of the Test Set")
+  # print("-----------")
+  # print("tn,fp,fn,tp")
+  # print(a)
+  # print("-----------")
+  # print("Precision of the MLP :\t" + str(metrics.precision_score(test_y, y_pred_list)))
+  # print("Recall of the MLP    :\t" + str(metrics.recall_score(test_y, y_pred_list)))
+  # print("F1 Score of the Model :\t" + str(metrics.f1_score(test_y, y_pred_list)))
   return y_pred_list
