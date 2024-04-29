@@ -15,6 +15,7 @@ library(plotly)
 library(viridis)
 library(lubridate)
 library(corrplot)
+library(RColorBrewer)
 
 theme_set(theme_classic())
 ```
@@ -36,11 +37,12 @@ i = 1
 for (file in fileList){
   data = pivot_longer(file, cols = c("F1", "Precision", "Recall"), names_to = "Measure", values_to = "Value")
   
-  ggplot(data, aes(Value, Prediction,  color = Measure)) +
+  ggplot(data, aes(Measure, Value,  color = Prediction)) +
     geom_point() +
-    facet_grid(Measure ~ .) +
-    ggtitle(extracted_names[[i]])
-
+    #facet_grid(Measure ~ .) +
+    ggtitle(extracted_names[[i]]) + 
+    scale_color_brewer(palette = "Set1")
+  
   ggsave(paste(extracted_names[[i]], "_plot.png"))
   i = i+1
   

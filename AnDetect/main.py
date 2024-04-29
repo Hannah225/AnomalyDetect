@@ -23,11 +23,13 @@ data_sources = [Process_data.get_normal_data,
                 Process_data.get_scaled_standard_data,
                 Process_data.get_pca_data,
                 Process_data.get_umap_data,
-                Process_data.get_merk_data,
+                #Process_data.get_merk_data,
                 Process_data.get_gauss_data
                 ]
 
-data_names = ["Normal", "Scaled.Robust", "Scaled.Standard", "PCA", "UMAP", "Merk", "Gauss"]
+data_names = ["Normal", "Scaled.Robust", "Scaled.Standard", "PCA", "UMAP", 
+              #"Merk",
+            "Gauss"]
 counter_datasources = 0 #for the outer for loop; i used in another loop
 
 number_of_splits = 12
@@ -68,7 +70,8 @@ for fn in data_sources:
 
         batchsize = 512
         learning_rate = 0.0001
-        epochs = 200
+        epochs = 1
+
 
         error_thresh = 0.5 #Later used to evaluate model (cutoff)
 
@@ -81,6 +84,7 @@ for fn in data_sources:
             #     num_samples=batchsize,
             #     replacement=False
             # )
+            
 
         #Weighted Loss Function
         class_weight = torch.FloatTensor([15])
@@ -129,7 +133,7 @@ for fn in data_sources:
         #clf = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=0.1)
         #svc = SVC()
         logistic_model = LogisticRegression(solver = 'newton-cholesky', max_iter = 1000)
-        isolation_forest = IsolationForest(n=200)
+        isolation_forest = IsolationForest(n_estimators=200)
         #Fitting
         knn_classifier.fit(train_x, train_y)
         #clf.fit(train_x)
